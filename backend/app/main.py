@@ -6,9 +6,12 @@ Run with:
 """
 
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes.query import router as query_router
 
@@ -17,6 +20,11 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
 )
+
+# ── Paths ──────────────────────────────────────────────────────────────
+# Resolve the frontend directory relative to the project root
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]  # backend/app/main.py → project root
+_FRONTEND_DIR = _PROJECT_ROOT / "frontend"
 
 # ── App ────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -41,10 +49,21 @@ app.add_middleware(
 app.include_router(query_router)
 
 
-@app.get("/", tags=["health"])
-async def root():
-    """Health-check / welcome endpoint."""
+@app.get("/", tags=["frontend"])
+async def serve_frontend():
+    """Serve the frontend UI."""
+    return FileResponse(_FRONTEND_DIR / "index.html")
+
+
+@app.get("/health", tags=["health"])
+async def health():
+    """Health-check endpoint."""
     return {
         "status": "ok",
         "message": "RAG Assistant API is running.",
     }
+
+
+# Mount static assets (CSS/JS/images) from the frontend folder — MUST be last
+if _FRONTEND_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_FRONTEND_DIR)), name="static")
